@@ -2,43 +2,37 @@ package com.alim.spring_demo.entity;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.OneToOne;
 import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
 @Entity
-@Table(name = "users")
+@Table(name = "business_profiles")
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-public class User {
+public class BusinessProfile {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false, unique = true)
-    private String email;
+    @OneToOne
+    @JoinColumn(name = "user_id", nullable = false, unique = true)
+    private User user;
 
     @Column(nullable = false)
-    private String password;
+    private String businessName;
 
     @Column(nullable = false)
-    private String firstName;
+    private String businessAddress;
 
-    @Column(nullable = false)
-    private String lastName;
-
-    @Column(nullable = false)
-    private String phone;
-
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
-    private Role role;
+    private String businessPhone;
+    private String description;
 }
