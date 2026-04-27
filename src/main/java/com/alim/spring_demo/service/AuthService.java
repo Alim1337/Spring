@@ -8,9 +8,11 @@ import org.springframework.stereotype.Service;
 import com.alim.spring_demo.dto.AuthResponse;
 import com.alim.spring_demo.dto.LoginRequest;
 import com.alim.spring_demo.dto.RegisterRequest;
+import com.alim.spring_demo.entity.Customer;
 import com.alim.spring_demo.entity.Role;
 import com.alim.spring_demo.entity.User;
 import com.alim.spring_demo.exception.DuplicateResourceException;
+import com.alim.spring_demo.repository.CustomerRepository;
 import com.alim.spring_demo.repository.UserRepository;
 import com.alim.spring_demo.security.JwtService;
 
@@ -21,6 +23,7 @@ import lombok.RequiredArgsConstructor;
 public class AuthService {
 
     private final UserRepository userRepository;
+    private final CustomerRepository customerRepository; // ← ajouté
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
     private final AuthenticationManager authenticationManager;
@@ -31,7 +34,6 @@ public class AuthService {
                 "Email already registered: " + request.getEmail());
         }
 
-        // prevent registering as ADMIN from the public endpoint
         if (request.getRole() == Role.ADMIN) {
             throw new DuplicateResourceException("Cannot register as ADMIN");
         }
@@ -45,6 +47,16 @@ public class AuthService {
         user.setRole(request.getRole());
 
         userRepository.save(user);
+
+        // ← auto-créer un Customer si le rôle est CUSTOMER
+        if (request.getRole() == Role.CUSTOMER) {
+            Customer customer = new Customer();
+            customer.setName(request.getFirstName() + " " + request.getLastName());
+            customer.setEmail(request.getEmail());
+            customer.setPhone(request.getPhone());
+            customer.setAddress(""); // à compléter plus tard dans le profil
+            customerRepository.save(customer);
+        }
 
         String token = jwtService.generateToken(user.getEmail());
         return new AuthResponse(
