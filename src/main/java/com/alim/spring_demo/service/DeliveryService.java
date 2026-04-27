@@ -16,6 +16,8 @@ import com.alim.spring_demo.exception.ResourceNotFoundException;
 import com.alim.spring_demo.repository.DeliveryRequestRepository;
 import com.alim.spring_demo.repository.DriverProfileRepository;
 import com.alim.spring_demo.repository.UserRepository;
+import com.alim.spring_demo.repository.CustomerRepository;
+
 
 import lombok.RequiredArgsConstructor;
 
@@ -23,37 +25,38 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class DeliveryService {
 
+private final CustomerRepository customerRepository; // ← ajoutez cette ligne
     private final DeliveryRequestRepository deliveryRepository;
     private final UserRepository userRepository;
     private final DriverProfileRepository driverProfileRepository;
 
     // BUSINESS: create a delivery request
     public DeliveryRequest createDelivery(DeliveryRequestCreate req, String businessEmail) {
-        User business = getUserByEmail(businessEmail);
-        User customer = userRepository.findById(req.getCustomerId())
-            .orElseThrow(() -> new ResourceNotFoundException(
-                "Customer not found with id: " + req.getCustomerId()));
+    User business = getUserByEmail(businessEmail);
 
-        if (customer.getRole() != Role.CUSTOMER) {
-            throw new InvalidOperationException("Target user is not a customer");
-        }
+    // Chercher dans customers d'abord, puis récupérer le User par email
+    Customer customer = customerRepository.findById(req.getCustomerId())
+        .orElseThrow(() -> new ResourceNotFoundException(
+            "Customer not found with id: " + req.getCustomerId()));
 
-        DeliveryRequest delivery = new DeliveryRequest();
-        delivery.setBusiness(business);
-        delivery.setCustomer(customer);
-        delivery.setPickupAddress(req.getPickupAddress());
-        delivery.setDropoffAddress(req.getDropoffAddress());
-        delivery.setItemDescription(req.getItemDescription());
-        delivery.setPrice(req.getPrice());
+    User customerUser = userRepository.findByEmail(customer.getEmail())
+        .orElseThrow(() -> new ResourceNotFoundException(
+            "User not found for customer email: " + customer.getEmail()));
 
-        return deliveryRepository.save(delivery);
+    if (customerUser.getRole() != Role.CUSTOMER) {
+        throw new InvalidOperationException("Target user is not a customer");
     }
 
-    // BUSINESS: get all their deliveries
-    public List<DeliveryRequest> getBusinessDeliveries(String email) {
-        User business = getUserByEmail(email);
-        return deliveryRepository.findByBusiness(business);
-    }
+    DeliveryRequest delivery = new DeliveryRequest();
+    delivery.setBusiness(business);
+    delivery.setCustomer(customerUser);
+    delivery.setPickupAddress(req.getPickupAddress());
+    delivery.setDropoffAddress(req.getDropoffAddress());
+    delivery.setItemDescription(req.getItemDescription());
+    delivery.setPrice(req.getPrice());
+
+    return deliveryRepository.save(delivery);
+}
 
     // CUSTOMER: get their incoming deliveries
     public List<DeliveryRequest> getCustomerDeliveries(String email) {
