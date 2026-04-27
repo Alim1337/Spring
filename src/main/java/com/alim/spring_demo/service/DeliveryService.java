@@ -6,6 +6,7 @@ import java.util.List;
 import org.springframework.stereotype.Service;
 
 import com.alim.spring_demo.dto.DeliveryRequestCreate;
+import com.alim.spring_demo.entity.Customer;
 import com.alim.spring_demo.entity.DeliveryRequest;
 import com.alim.spring_demo.entity.DeliveryStatus;
 import com.alim.spring_demo.entity.DriverProfile;
@@ -13,11 +14,10 @@ import com.alim.spring_demo.entity.Role;
 import com.alim.spring_demo.entity.User;
 import com.alim.spring_demo.exception.InvalidOperationException;
 import com.alim.spring_demo.exception.ResourceNotFoundException;
+import com.alim.spring_demo.repository.CustomerRepository;
 import com.alim.spring_demo.repository.DeliveryRequestRepository;
 import com.alim.spring_demo.repository.DriverProfileRepository;
 import com.alim.spring_demo.repository.UserRepository;
-import com.alim.spring_demo.repository.CustomerRepository;
-
 
 import lombok.RequiredArgsConstructor;
 
@@ -25,38 +25,43 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class DeliveryService {
 
-private final CustomerRepository customerRepository; // ← ajoutez cette ligne
+    private final CustomerRepository customerRepository;
     private final DeliveryRequestRepository deliveryRepository;
     private final UserRepository userRepository;
     private final DriverProfileRepository driverProfileRepository;
 
     // BUSINESS: create a delivery request
     public DeliveryRequest createDelivery(DeliveryRequestCreate req, String businessEmail) {
-    User business = getUserByEmail(businessEmail);
+        User business = getUserByEmail(businessEmail);
 
-    // Chercher dans customers d'abord, puis récupérer le User par email
-    Customer customer = customerRepository.findById(req.getCustomerId())
-        .orElseThrow(() -> new ResourceNotFoundException(
-            "Customer not found with id: " + req.getCustomerId()));
+        Customer customer = customerRepository.findById(req.getCustomerId())
+            .orElseThrow(() -> new ResourceNotFoundException(
+                "Customer not found with id: " + req.getCustomerId()));
 
-    User customerUser = userRepository.findByEmail(customer.getEmail())
-        .orElseThrow(() -> new ResourceNotFoundException(
-            "User not found for customer email: " + customer.getEmail()));
+        User customerUser = userRepository.findByEmail(customer.getEmail())
+            .orElseThrow(() -> new ResourceNotFoundException(
+                "User not found for customer email: " + customer.getEmail()));
 
-    if (customerUser.getRole() != Role.CUSTOMER) {
-        throw new InvalidOperationException("Target user is not a customer");
+        if (customerUser.getRole() != Role.CUSTOMER) {
+            throw new InvalidOperationException("Target user is not a customer");
+        }
+
+        DeliveryRequest delivery = new DeliveryRequest();
+        delivery.setBusiness(business);
+        delivery.setCustomer(customerUser);
+        delivery.setPickupAddress(req.getPickupAddress());
+        delivery.setDropoffAddress(req.getDropoffAddress());
+        delivery.setItemDescription(req.getItemDescription());
+        delivery.setPrice(req.getPrice());
+
+        return deliveryRepository.save(delivery);
     }
 
-    DeliveryRequest delivery = new DeliveryRequest();
-    delivery.setBusiness(business);
-    delivery.setCustomer(customerUser);
-    delivery.setPickupAddress(req.getPickupAddress());
-    delivery.setDropoffAddress(req.getDropoffAddress());
-    delivery.setItemDescription(req.getItemDescription());
-    delivery.setPrice(req.getPrice());
-
-    return deliveryRepository.save(delivery);
-}
+    // BUSINESS: get all their deliveries
+    public List<DeliveryRequest> getBusinessDeliveries(String email) {
+        User business = getUserByEmail(email);
+        return deliveryRepository.findByBusiness(business);
+    }
 
     // CUSTOMER: get their incoming deliveries
     public List<DeliveryRequest> getCustomerDeliveries(String email) {
@@ -120,7 +125,6 @@ private final CustomerRepository customerRepository; // ← ajoutez cette ligne
         }
         if (newStatus == DeliveryStatus.DELIVERED) {
             delivery.setDeliveredAt(LocalDateTime.now());
-            // free up the driver
             driverProfileRepository.findByUser(driver).ifPresent(p -> {
                 p.setAvailable(true);
                 p.setTotalDeliveries(p.getTotalDeliveries() + 1);
@@ -148,7 +152,6 @@ private final CustomerRepository customerRepository; // ← ajoutez cette ligne
 
         delivery.setRating(rating);
 
-        // update driver average rating
         if (delivery.getDriver() != null) {
             driverProfileRepository.findByUser(delivery.getDriver()).ifPresent(p -> {
                 double newRating = ((p.getRating() * p.getTotalDeliveries()) + rating)
