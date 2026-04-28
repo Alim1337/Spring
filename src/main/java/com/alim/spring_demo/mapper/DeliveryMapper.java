@@ -11,6 +11,7 @@ public class DeliveryMapper {
     public DeliveryRequestResponse toResponse(DeliveryRequest d) {
         DeliveryRequestResponse res = new DeliveryRequestResponse();
         res.setId(d.getId());
+        res.setTrackingCode(d.getTrackingCode());
         res.setBusinessName(d.getBusiness().getFirstName()
             + " " + d.getBusiness().getLastName());
         res.setCustomerName(d.getCustomer().getFirstName()

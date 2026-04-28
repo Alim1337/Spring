@@ -1,36 +1,28 @@
 package com.alim.spring_demo.mapper;
 
-import com.alim.spring_demo.dto.DeliveryRequestResponse;
-import com.alim.spring_demo.entity.DeliveryRequest;
 import org.springframework.stereotype.Component;
 
-@Component
-public class DeliveryMapper {
+import com.alim.spring_demo.dto.DriverRequest;
+import com.alim.spring_demo.dto.DriverResponse;
+import com.alim.spring_demo.entity.Driver;
 
-    public DeliveryRequestResponse toResponse(DeliveryRequest d) {
-        DeliveryRequestResponse res = new DeliveryRequestResponse();
-        res.setId(d.getId());
-        res.setTrackingCode(d.getTrackingCode());
-        res.setBusinessName(d.getBusiness().getFirstName()
-            + " " + d.getBusiness().getLastName());
-        res.setCustomerName(d.getCustomer().getFirstName()
-            + " " + d.getCustomer().getLastName());
-        res.setCustomerPhone(d.getCustomer().getPhone());
-        res.setDriverName(d.getDriver() != null
-            ? d.getDriver().getFirstName() + " " + d.getDriver().getLastName()
-            : null);
-        res.setDriverPhone(d.getDriver() != null
-            ? d.getDriver().getPhone() : null);
-        res.setPickupAddress(d.getPickupAddress());
-        res.setDropoffAddress(d.getDropoffAddress());
-        res.setItemDescription(d.getItemDescription());
-        res.setPrice(d.getPrice());
-        res.setStatus(d.getStatus());
-        res.setCreatedAt(d.getCreatedAt());
-        res.setAcceptedAt(d.getAcceptedAt());
-        res.setPickedUpAt(d.getPickedUpAt());
-        res.setDeliveredAt(d.getDeliveredAt());
-        res.setRating(d.getRating());
-        return res;
+@Component
+public class DriverMapper {
+
+    public Driver toEntity(DriverRequest request) {
+        Driver driver = new Driver();
+        driver.setName(request.getName());
+        driver.setPhone(request.getPhone());
+        driver.setAvailable(request.isAvailable());
+        return driver;
+    }
+
+    public DriverResponse toResponse(Driver driver) {
+        DriverResponse response = new DriverResponse();
+        response.setId(driver.getId());
+        response.setName(driver.getName());
+        response.setPhone(driver.getPhone());
+        response.setAvailable(driver.isAvailable());
+        return response;
     }
 }
