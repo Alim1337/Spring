@@ -2,6 +2,7 @@ package com.alim.spring_demo.service;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Random;
 
 import org.springframework.stereotype.Service;
 
@@ -30,7 +31,6 @@ public class DeliveryService {
     private final UserRepository userRepository;
     private final DriverProfileRepository driverProfileRepository;
 
-    // BUSINESS: create a delivery request
     public DeliveryRequest createDelivery(DeliveryRequestCreate req, String businessEmail) {
         User business = getUserByEmail(businessEmail);
 
@@ -53,34 +53,30 @@ public class DeliveryService {
         delivery.setDropoffAddress(req.getDropoffAddress());
         delivery.setItemDescription(req.getItemDescription());
         delivery.setPrice(req.getPrice());
+        delivery.setTrackingCode(generateTrackingCode());
 
         return deliveryRepository.save(delivery);
     }
 
-    // BUSINESS: get all their deliveries
     public List<DeliveryRequest> getBusinessDeliveries(String email) {
         User business = getUserByEmail(email);
         return deliveryRepository.findByBusiness(business);
     }
 
-    // CUSTOMER: get their incoming deliveries
     public List<DeliveryRequest> getCustomerDeliveries(String email) {
         User customer = getUserByEmail(email);
         return deliveryRepository.findByCustomer(customer);
     }
 
-    // DRIVER: get all available (PENDING) deliveries
     public List<DeliveryRequest> getAvailableDeliveries() {
         return deliveryRepository.findByStatus(DeliveryStatus.PENDING);
     }
 
-    // DRIVER: get their accepted deliveries
     public List<DeliveryRequest> getDriverDeliveries(String email) {
         User driver = getUserByEmail(email);
         return deliveryRepository.findByDriver(driver);
     }
 
-    // DRIVER: accept a delivery
     public DeliveryRequest acceptDelivery(Long deliveryId, String driverEmail) {
         DeliveryRequest delivery = getDeliveryById(deliveryId);
         User driver = getUserByEmail(driverEmail);
@@ -90,10 +86,12 @@ public class DeliveryService {
         }
 
         DriverProfile profile = driverProfileRepository.findByUser(driver)
-            .orElseThrow(() -> new ResourceNotFoundException("Driver profile not found"));
+            .orElseThrow(() -> new ResourceNotFoundException(
+                "Driver profile not found — please complete your setup first"));
 
         if (!profile.isAvailable()) {
-            throw new InvalidOperationException("You already have an active delivery");
+            throw new InvalidOperationException(
+                "You already have an active delivery");
         }
 
         delivery.setDriver(driver);
@@ -106,7 +104,6 @@ public class DeliveryService {
         return deliveryRepository.save(delivery);
     }
 
-    // DRIVER: update delivery status
     public DeliveryRequest updateStatus(Long deliveryId,
                                         DeliveryStatus newStatus,
                                         String driverEmail) {
@@ -135,7 +132,6 @@ public class DeliveryService {
         return deliveryRepository.save(delivery);
     }
 
-    // CUSTOMER: rate a delivery
     public DeliveryRequest rateDelivery(Long deliveryId, int rating, String customerEmail) {
         DeliveryRequest delivery = getDeliveryById(deliveryId);
         User customer = getUserByEmail(customerEmail);
@@ -164,7 +160,6 @@ public class DeliveryService {
         return deliveryRepository.save(delivery);
     }
 
-    // DRIVER: update location
     public void updateLocation(String driverEmail, Double lat, Double lng) {
         User driver = getUserByEmail(driverEmail);
         driverProfileRepository.findByUser(driver).ifPresent(p -> {
@@ -172,6 +167,22 @@ public class DeliveryService {
             p.setCurrentLongitude(lng);
             driverProfileRepository.save(p);
         });
+    }
+
+    public DeliveryRequest trackByCode(String code) {
+        return deliveryRepository.findByTrackingCode(code)
+            .orElseThrow(() -> new ResourceNotFoundException(
+                "No delivery found with tracking code: " + code));
+    }
+
+    private String generateTrackingCode() {
+        String chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+        StringBuilder code = new StringBuilder("DLV-");
+        Random random = new Random();
+        for (int i = 0; i < 8; i++) {
+            code.append(chars.charAt(random.nextInt(chars.length())));
+        }
+        return code.toString();
     }
 
     private DeliveryRequest getDeliveryById(Long id) {

@@ -1,10 +1,20 @@
 package com.alim.spring_demo.entity;
 
-import jakarta.persistence.*;
+import java.time.LocalDateTime;
+
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "delivery_requests")
@@ -17,17 +27,17 @@ public class DeliveryRequest {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    // the business that created this delivery
+    @Column(unique = true)
+    private String trackingCode;
+
     @ManyToOne
     @JoinColumn(name = "business_user_id", nullable = false)
     private User business;
 
-    // the customer receiving the delivery
     @ManyToOne
     @JoinColumn(name = "customer_user_id", nullable = false)
     private User customer;
 
-    // the driver assigned (null until accepted)
     @ManyToOne
     @JoinColumn(name = "driver_user_id")
     private User driver;
@@ -55,6 +65,5 @@ public class DeliveryRequest {
     private LocalDateTime pickedUpAt;
     private LocalDateTime deliveredAt;
 
-    // customer rates the delivery after completion
     private Integer rating;
 }

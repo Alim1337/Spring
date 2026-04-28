@@ -9,6 +9,7 @@ import lombok.Data;
 @Data
 public class DeliveryRequestResponse {
     private Long id;
+    private String trackingCode;
     private String businessName;
     private String customerName;
     private String customerPhone;

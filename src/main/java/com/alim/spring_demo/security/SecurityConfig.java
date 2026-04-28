@@ -48,7 +48,7 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
-            .cors(Customizer.withDefaults())        // ← enables CORS
+            .cors(Customizer.withDefaults())
             .csrf(csrf -> csrf.disable())
             .headers(headers -> headers
                 .frameOptions(frame -> frame.disable())
@@ -56,7 +56,7 @@ public class SecurityConfig {
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers(
                     "/api/auth/**",
-                    "/api/users/**",
+                    "/api/deliveries/track/**",
                     "/swagger-ui/**",
                     "/swagger-ui.html",
                     "/swagger-ui/index.html",

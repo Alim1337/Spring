@@ -32,7 +32,6 @@ public class DeliveryController {
     private final DeliveryService deliveryService;
     private final DeliveryMapper deliveryMapper;
 
-    // BUSINESS: create delivery
     @PostMapping
     public ResponseEntity<DeliveryRequestResponse> create(
             @Valid @RequestBody DeliveryRequestCreate req,
@@ -42,7 +41,6 @@ public class DeliveryController {
                 deliveryService.createDelivery(req, userDetails.getUsername())));
     }
 
-    // BUSINESS: my deliveries
     @GetMapping("/my-business")
     public ResponseEntity<List<DeliveryRequestResponse>> getBusinessDeliveries(
             @AuthenticationPrincipal UserDetails userDetails) {
@@ -51,7 +49,6 @@ public class DeliveryController {
                 .stream().map(deliveryMapper::toResponse).toList());
     }
 
-    // CUSTOMER: my incoming deliveries
     @GetMapping("/my-deliveries")
     public ResponseEntity<List<DeliveryRequestResponse>> getCustomerDeliveries(
             @AuthenticationPrincipal UserDetails userDetails) {
@@ -60,7 +57,6 @@ public class DeliveryController {
                 .stream().map(deliveryMapper::toResponse).toList());
     }
 
-    // DRIVER: available deliveries to accept
     @GetMapping("/available")
     public ResponseEntity<List<DeliveryRequestResponse>> getAvailable() {
         return ResponseEntity.ok(
@@ -68,7 +64,6 @@ public class DeliveryController {
                 .stream().map(deliveryMapper::toResponse).toList());
     }
 
-    // DRIVER: my active deliveries
     @GetMapping("/my-active")
     public ResponseEntity<List<DeliveryRequestResponse>> getDriverDeliveries(
             @AuthenticationPrincipal UserDetails userDetails) {
@@ -77,7 +72,6 @@ public class DeliveryController {
                 .stream().map(deliveryMapper::toResponse).toList());
     }
 
-    // DRIVER: accept a delivery
     @PatchMapping("/{id}/accept")
     public ResponseEntity<DeliveryRequestResponse> accept(
             @PathVariable Long id,
@@ -87,7 +81,6 @@ public class DeliveryController {
                 deliveryService.acceptDelivery(id, userDetails.getUsername())));
     }
 
-    // DRIVER: update status
     @PatchMapping("/{id}/status")
     public ResponseEntity<DeliveryRequestResponse> updateStatus(
             @PathVariable Long id,
@@ -99,7 +92,6 @@ public class DeliveryController {
                 deliveryService.updateStatus(id, status, userDetails.getUsername())));
     }
 
-    // CUSTOMER: rate delivery
     @PostMapping("/{id}/rate")
     public ResponseEntity<DeliveryRequestResponse> rate(
             @PathVariable Long id,
@@ -111,7 +103,6 @@ public class DeliveryController {
                     id, body.get("rating"), userDetails.getUsername())));
     }
 
-    // DRIVER: update location
     @PatchMapping("/location")
     public ResponseEntity<Void> updateLocation(
             @RequestBody Map<String, Double> body,
@@ -121,5 +112,14 @@ public class DeliveryController {
             body.get("latitude"),
             body.get("longitude"));
         return ResponseEntity.ok().build();
+    }
+
+    // PUBLIC — no auth needed
+    @GetMapping("/track/{code}")
+    public ResponseEntity<DeliveryRequestResponse> trackByCode(
+            @PathVariable String code) {
+        return ResponseEntity.ok(
+            deliveryMapper.toResponse(
+                deliveryService.trackByCode(code)));
     }
 }
