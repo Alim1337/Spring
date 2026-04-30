@@ -1,3 +1,4 @@
+// Full updated DeliveryService.java
 package com.alim.spring_demo.service;
 
 import java.time.LocalDateTime;
@@ -30,6 +31,7 @@ public class DeliveryService {
     private final DeliveryRequestRepository deliveryRepository;
     private final UserRepository userRepository;
     private final DriverProfileRepository driverProfileRepository;
+    private final NotificationService notificationService;
 
     public DeliveryRequest createDelivery(DeliveryRequestCreate req, String businessEmail) {
         User business = getUserByEmail(businessEmail);
@@ -55,7 +57,14 @@ public class DeliveryService {
         delivery.setPrice(req.getPrice());
         delivery.setTrackingCode(generateTrackingCode());
 
-        return deliveryRepository.save(delivery);
+        DeliveryRequest saved = deliveryRepository.save(delivery);
+
+        // notify customer
+        notificationService.send(customerUser,
+            "📦 New delivery incoming: " + req.getItemDescription(),
+            "NEW_DELIVERY");
+
+        return saved;
     }
 
     public List<DeliveryRequest> getBusinessDeliveries(String email) {
@@ -90,8 +99,7 @@ public class DeliveryService {
                 "Driver profile not found — please complete your setup first"));
 
         if (!profile.isAvailable()) {
-            throw new InvalidOperationException(
-                "You already have an active delivery");
+            throw new InvalidOperationException("You already have an active delivery");
         }
 
         delivery.setDriver(driver);
@@ -101,7 +109,17 @@ public class DeliveryService {
         profile.setAvailable(false);
         driverProfileRepository.save(profile);
 
-        return deliveryRepository.save(delivery);
+        DeliveryRequest saved = deliveryRepository.save(delivery);
+
+        // notify customer and business
+        notificationService.send(delivery.getCustomer(),
+            "🚗 " + driver.getFirstName() + " accepted your delivery and is on the way!",
+            "DELIVERY_ACCEPTED");
+        notificationService.send(delivery.getBusiness(),
+            "✅ Driver " + driver.getFirstName() + " accepted delivery #" + deliveryId,
+            "DELIVERY_ACCEPTED");
+
+        return saved;
     }
 
     public DeliveryRequest updateStatus(Long deliveryId,
@@ -111,15 +129,24 @@ public class DeliveryService {
         User driver = getUserByEmail(driverEmail);
 
         if (!delivery.getDriver().getId().equals(driver.getId())) {
-            throw new InvalidOperationException(
-                "You are not assigned to this delivery");
+            throw new InvalidOperationException("You are not assigned to this delivery");
         }
 
         delivery.setStatus(newStatus);
 
         if (newStatus == DeliveryStatus.PICKED_UP) {
             delivery.setPickedUpAt(LocalDateTime.now());
+            notificationService.send(delivery.getCustomer(),
+                "📦 Your package has been picked up and is heading your way!",
+                "PICKED_UP");
         }
+
+        if (newStatus == DeliveryStatus.ON_THE_WAY) {
+            notificationService.send(delivery.getCustomer(),
+                "🛵 Your delivery is on the way! Get ready to receive it.",
+                "ON_THE_WAY");
+        }
+
         if (newStatus == DeliveryStatus.DELIVERED) {
             delivery.setDeliveredAt(LocalDateTime.now());
             driverProfileRepository.findByUser(driver).ifPresent(p -> {
@@ -127,8 +154,52 @@ public class DeliveryService {
                 p.setTotalDeliveries(p.getTotalDeliveries() + 1);
                 driverProfileRepository.save(p);
             });
+            notificationService.send(delivery.getCustomer(),
+                "🎉 Your delivery has arrived! Don't forget to rate your driver.",
+                "DELIVERED");
+            notificationService.send(delivery.getBusiness(),
+                "✅ Delivery #" + deliveryId + " completed successfully!",
+                "DELIVERED");
         }
 
+        if (newStatus == DeliveryStatus.CANCELLED) {
+            notificationService.send(delivery.getCustomer(),
+                "❌ Your delivery #" + deliveryId + " was cancelled.",
+                "CANCELLED");
+        }
+
+        return deliveryRepository.save(delivery);
+    }
+
+    public DeliveryRequest cancelDelivery(Long deliveryId, String businessEmail) {
+        DeliveryRequest delivery = getDeliveryById(deliveryId);
+        User business = getUserByEmail(businessEmail);
+
+        if (!delivery.getBusiness().getId().equals(business.getId())) {
+            throw new InvalidOperationException("This is not your delivery");
+        }
+        if (delivery.getStatus() == DeliveryStatus.DELIVERED) {
+            throw new InvalidOperationException("Cannot cancel a delivered order");
+        }
+        if (delivery.getStatus() == DeliveryStatus.CANCELLED) {
+            throw new InvalidOperationException("Already cancelled");
+        }
+
+        if (delivery.getDriver() != null) {
+            driverProfileRepository.findByUser(delivery.getDriver()).ifPresent(p -> {
+                p.setAvailable(true);
+                driverProfileRepository.save(p);
+            });
+            notificationService.send(delivery.getDriver(),
+                "❌ Delivery #" + deliveryId + " was cancelled by the business.",
+                "CANCELLED");
+        }
+
+        notificationService.send(delivery.getCustomer(),
+            "❌ Your delivery was cancelled by the sender.",
+            "CANCELLED");
+
+        delivery.setStatus(DeliveryStatus.CANCELLED);
         return deliveryRepository.save(delivery);
     }
 
@@ -155,6 +226,9 @@ public class DeliveryService {
                 p.setRating(Math.round(newRating * 10.0) / 10.0);
                 driverProfileRepository.save(p);
             });
+            notificationService.send(delivery.getDriver(),
+                "⭐ You received a " + rating + "/5 rating for delivery #" + deliveryId,
+                "RATED");
         }
 
         return deliveryRepository.save(delivery);

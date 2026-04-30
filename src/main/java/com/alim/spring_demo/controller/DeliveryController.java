@@ -122,4 +122,12 @@ public class DeliveryController {
             deliveryMapper.toResponse(
                 deliveryService.trackByCode(code)));
     }
+    @PatchMapping("/{id}/cancel")
+public ResponseEntity<DeliveryRequestResponse> cancel(
+        @PathVariable Long id,
+        @AuthenticationPrincipal UserDetails userDetails) {
+    return ResponseEntity.ok(
+        deliveryMapper.toResponse(
+            deliveryService.cancelDelivery(id, userDetails.getUsername())));
+}
 }
