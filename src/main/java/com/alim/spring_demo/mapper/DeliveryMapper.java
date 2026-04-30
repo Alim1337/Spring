@@ -4,16 +4,29 @@ import org.springframework.stereotype.Component;
 
 import com.alim.spring_demo.dto.DeliveryRequestResponse;
 import com.alim.spring_demo.entity.DeliveryRequest;
+import com.alim.spring_demo.repository.BusinessProfileRepository;
+
+import lombok.RequiredArgsConstructor;
 
 @Component
+@RequiredArgsConstructor
 public class DeliveryMapper {
+
+    private final BusinessProfileRepository businessProfileRepository;
 
     public DeliveryRequestResponse toResponse(DeliveryRequest d) {
         DeliveryRequestResponse res = new DeliveryRequestResponse();
         res.setId(d.getId());
         res.setTrackingCode(d.getTrackingCode());
-        res.setBusinessName(d.getBusiness().getFirstName()
-            + " " + d.getBusiness().getLastName());
+
+        // Show business profile name if available, fallback to user name
+        String businessName = businessProfileRepository
+            .findByUser(d.getBusiness())
+            .map(bp -> bp.getBusinessName())
+            .orElse(d.getBusiness().getFirstName()
+                + " " + d.getBusiness().getLastName());
+        res.setBusinessName(businessName);
+
         res.setCustomerName(d.getCustomer().getFirstName()
             + " " + d.getCustomer().getLastName());
         res.setCustomerPhone(d.getCustomer().getPhone());
