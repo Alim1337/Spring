@@ -19,6 +19,7 @@ import com.alim.spring_demo.dto.DeliveryRequestCreate;
 import com.alim.spring_demo.dto.DeliveryRequestResponse;
 import com.alim.spring_demo.entity.DeliveryStatus;
 import com.alim.spring_demo.mapper.DeliveryMapper;
+import com.alim.spring_demo.repository.DriverProfileRepository;
 import com.alim.spring_demo.service.DeliveryService;
 
 import jakarta.validation.Valid;
@@ -31,6 +32,7 @@ public class DeliveryController {
 
     private final DeliveryService deliveryService;
     private final DeliveryMapper deliveryMapper;
+    private final DriverProfileRepository driverProfileRepository;
 
     @PostMapping
     public ResponseEntity<DeliveryRequestResponse> create(
@@ -129,5 +131,28 @@ public ResponseEntity<DeliveryRequestResponse> cancel(
     return ResponseEntity.ok(
         deliveryMapper.toResponse(
             deliveryService.cancelDelivery(id, userDetails.getUsername())));
+}
+// Get driver location for a delivery (public — for tracking page)
+@GetMapping("/track/{code}/location")
+public ResponseEntity<Map<String, Object>> getDriverLocation(
+        @PathVariable String code) {
+    DeliveryRequest delivery = deliveryService.trackByCode(code);
+    if (delivery.getDriver() == null) {
+        return ResponseEntity.ok(Map.of("available", false));
+    }
+    return driverProfileRepository
+        .findByUser(delivery.getDriver())
+        .map(p -> {
+            if (p.getCurrentLatitude() == null) {
+                return ResponseEntity.ok(Map.<String, Object>of("available", false));
+            }
+            return ResponseEntity.ok(Map.<String, Object>of(
+                "available", true,
+                "latitude", p.getCurrentLatitude(),
+                "longitude", p.getCurrentLongitude(),
+                "driverName", delivery.getDriver().getFirstName()
+            ));
+        })
+        .orElse(ResponseEntity.ok(Map.of("available", false)));
 }
 }
