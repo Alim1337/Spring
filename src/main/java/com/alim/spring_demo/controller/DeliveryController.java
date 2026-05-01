@@ -17,6 +17,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.alim.spring_demo.dto.DeliveryRequestCreate;
 import com.alim.spring_demo.dto.DeliveryRequestResponse;
+import com.alim.spring_demo.entity.DeliveryRequest;
 import com.alim.spring_demo.entity.DeliveryStatus;
 import com.alim.spring_demo.mapper.DeliveryMapper;
 import com.alim.spring_demo.repository.DriverProfileRepository;
