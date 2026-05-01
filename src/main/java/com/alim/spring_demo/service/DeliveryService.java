@@ -34,38 +34,43 @@ public class DeliveryService {
     private final NotificationService notificationService;
 
     public DeliveryRequest createDelivery(DeliveryRequestCreate req, String businessEmail) {
-        User business = getUserByEmail(businessEmail);
+    User business = getUserByEmail(businessEmail);
 
+    DeliveryRequest delivery = new DeliveryRequest();
+    delivery.setBusiness(business);
+    delivery.setPickupAddress(req.getPickupAddress());
+    delivery.setDropoffAddress(req.getDropoffAddress());
+    delivery.setItemDescription(req.getItemDescription());
+    delivery.setPrice(req.getPrice());
+    delivery.setTrackingCode(generateTrackingCode());
+
+    // Option A — registered customer selected
+    if (req.getCustomerId() != null) {
         Customer customer = customerRepository.findById(req.getCustomerId())
             .orElseThrow(() -> new ResourceNotFoundException(
                 "Customer not found with id: " + req.getCustomerId()));
-
         User customerUser = userRepository.findByEmail(customer.getEmail())
             .orElseThrow(() -> new ResourceNotFoundException(
                 "User not found for customer email: " + customer.getEmail()));
-
-        if (customerUser.getRole() != Role.CUSTOMER) {
-            throw new InvalidOperationException("Target user is not a customer");
-        }
-
-        DeliveryRequest delivery = new DeliveryRequest();
-        delivery.setBusiness(business);
         delivery.setCustomer(customerUser);
-        delivery.setPickupAddress(req.getPickupAddress());
-        delivery.setDropoffAddress(req.getDropoffAddress());
-        delivery.setItemDescription(req.getItemDescription());
-        delivery.setPrice(req.getPrice());
-        delivery.setTrackingCode(generateTrackingCode());
 
-        DeliveryRequest saved = deliveryRepository.save(delivery);
-
-        // notify customer
+        // notify registered customer
         notificationService.send(customerUser,
             "📦 New delivery incoming: " + req.getItemDescription(),
             "NEW_DELIVERY");
 
-        return saved;
+    // Option B — unregistered recipient info provided
+    } else if (req.getRecipientName() != null || req.getRecipientEmail() != null) {
+        delivery.setRecipientName(req.getRecipientName());
+        delivery.setRecipientEmail(req.getRecipientEmail());
+        delivery.setRecipientPhone(req.getRecipientPhone());
+
+    // Option C — no recipient, business will share code manually
     }
+    // else: no recipient set, delivery.customer stays null
+
+    return deliveryRepository.save(delivery);
+}
 
     public List<DeliveryRequest> getBusinessDeliveries(String email) {
         User business = getUserByEmail(email);

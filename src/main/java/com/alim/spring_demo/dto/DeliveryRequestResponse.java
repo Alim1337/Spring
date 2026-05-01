@@ -11,10 +11,17 @@ public class DeliveryRequestResponse {
     private Long id;
     private String trackingCode;
     private String businessName;
+
+    // recipient info (registered or not)
     private String customerName;
     private String customerPhone;
+    private String customerEmail;
+    private boolean customerRegistered;
+
+    // driver info
     private String driverName;
     private String driverPhone;
+
     private String pickupAddress;
     private String dropoffAddress;
     private String itemDescription;

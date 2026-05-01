@@ -7,8 +7,11 @@ import lombok.Data;
 @Data
 public class DeliveryRequestCreate {
 
-    @NotNull(message = "Customer ID is required")
-    private Long customerId;
+    // ALL recipient fields are optional
+    private Long customerId;          // registered customer
+    private String recipientName;     // unregistered recipient name
+    private String recipientEmail;    // unregistered recipient email
+    private String recipientPhone;    // unregistered recipient phone
 
     @NotBlank(message = "Pickup address is required")
     private String pickupAddress;

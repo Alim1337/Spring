@@ -34,9 +34,20 @@ public class DeliveryRequest {
     @JoinColumn(name = "business_user_id", nullable = false)
     private User business;
 
+    // nullable — recipient might not be a registered user
     @ManyToOne
-    @JoinColumn(name = "customer_user_id", nullable = false)
+    @JoinColumn(name = "customer_user_id")
     private User customer;
+
+    // for unregistered recipients
+    @Column
+    private String recipientName;
+
+    @Column
+    private String recipientEmail;
+
+    @Column
+    private String recipientPhone;
 
     @ManyToOne
     @JoinColumn(name = "driver_user_id")

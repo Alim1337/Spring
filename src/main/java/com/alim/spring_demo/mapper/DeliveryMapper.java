@@ -19,7 +19,7 @@ public class DeliveryMapper {
         res.setId(d.getId());
         res.setTrackingCode(d.getTrackingCode());
 
-        // Show business profile name if available, fallback to user name
+        // business name from profile or fallback to user name
         String businessName = businessProfileRepository
             .findByUser(d.getBusiness())
             .map(bp -> bp.getBusinessName())
@@ -27,14 +27,27 @@ public class DeliveryMapper {
                 + " " + d.getBusiness().getLastName());
         res.setBusinessName(businessName);
 
-        res.setCustomerName(d.getCustomer().getFirstName()
-            + " " + d.getCustomer().getLastName());
-        res.setCustomerPhone(d.getCustomer().getPhone());
+        // recipient — registered customer or manual info
+        if (d.getCustomer() != null) {
+            res.setCustomerName(d.getCustomer().getFirstName()
+                + " " + d.getCustomer().getLastName());
+            res.setCustomerPhone(d.getCustomer().getPhone());
+            res.setCustomerEmail(d.getCustomer().getEmail());
+            res.setCustomerRegistered(true);
+        } else {
+            res.setCustomerName(d.getRecipientName());
+            res.setCustomerPhone(d.getRecipientPhone());
+            res.setCustomerEmail(d.getRecipientEmail());
+            res.setCustomerRegistered(false);
+        }
+
+        // driver
         res.setDriverName(d.getDriver() != null
             ? d.getDriver().getFirstName() + " " + d.getDriver().getLastName()
             : null);
         res.setDriverPhone(d.getDriver() != null
             ? d.getDriver().getPhone() : null);
+
         res.setPickupAddress(d.getPickupAddress());
         res.setDropoffAddress(d.getDropoffAddress());
         res.setItemDescription(d.getItemDescription());
