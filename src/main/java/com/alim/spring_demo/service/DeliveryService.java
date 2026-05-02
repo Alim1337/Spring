@@ -1,13 +1,14 @@
-// Full updated DeliveryService.java
 package com.alim.spring_demo.service;
 
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Random;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import com.alim.spring_demo.dto.DeliveryRequestCreate;
+import com.alim.spring_demo.entity.BusinessProfile;
 import com.alim.spring_demo.entity.Customer;
 import com.alim.spring_demo.entity.DeliveryRequest;
 import com.alim.spring_demo.entity.DeliveryStatus;
@@ -16,6 +17,7 @@ import com.alim.spring_demo.entity.Role;
 import com.alim.spring_demo.entity.User;
 import com.alim.spring_demo.exception.InvalidOperationException;
 import com.alim.spring_demo.exception.ResourceNotFoundException;
+import com.alim.spring_demo.repository.BusinessProfileRepository;
 import com.alim.spring_demo.repository.CustomerRepository;
 import com.alim.spring_demo.repository.DeliveryRequestRepository;
 import com.alim.spring_demo.repository.DriverProfileRepository;
@@ -32,45 +34,69 @@ public class DeliveryService {
     private final UserRepository userRepository;
     private final DriverProfileRepository driverProfileRepository;
     private final NotificationService notificationService;
+    private final EmailService emailService;
+    private final BusinessProfileRepository businessProfileRepository;
+
+    @Value("${app.frontend.url:http://localhost:3000}")
+    private String frontendUrl;
+
+    // ─── CREATE ───────────────────────────────────────────────────────────────
 
     public DeliveryRequest createDelivery(DeliveryRequestCreate req, String businessEmail) {
-    User business = getUserByEmail(businessEmail);
+        User business = getUserByEmail(businessEmail);
 
-    DeliveryRequest delivery = new DeliveryRequest();
-    delivery.setBusiness(business);
-    delivery.setPickupAddress(req.getPickupAddress());
-    delivery.setDropoffAddress(req.getDropoffAddress());
-    delivery.setItemDescription(req.getItemDescription());
-    delivery.setPrice(req.getPrice());
-    delivery.setTrackingCode(generateTrackingCode());
-
-    // Option A — registered customer selected
-    if (req.getCustomerId() != null) {
         Customer customer = customerRepository.findById(req.getCustomerId())
             .orElseThrow(() -> new ResourceNotFoundException(
                 "Customer not found with id: " + req.getCustomerId()));
+
         User customerUser = userRepository.findByEmail(customer.getEmail())
             .orElseThrow(() -> new ResourceNotFoundException(
                 "User not found for customer email: " + customer.getEmail()));
-        delivery.setCustomer(customerUser);
 
-        // notify registered customer
+        if (customerUser.getRole() != Role.CUSTOMER) {
+            throw new InvalidOperationException("Target user is not a customer");
+        }
+
+        DeliveryRequest delivery = new DeliveryRequest();
+        delivery.setBusiness(business);
+        delivery.setCustomer(customerUser);
+        delivery.setPickupAddress(req.getPickupAddress());
+        delivery.setDropoffAddress(req.getDropoffAddress());
+        delivery.setItemDescription(req.getItemDescription());
+        delivery.setPrice(req.getPrice());
+        delivery.setTrackingCode(generateTrackingCode());
+
+        DeliveryRequest saved = deliveryRepository.save(delivery);
+
+        // In-app notification
         notificationService.send(customerUser,
             "📦 New delivery incoming: " + req.getItemDescription(),
             "NEW_DELIVERY");
 
-    // Option B — unregistered recipient info provided
-    } else if (req.getRecipientName() != null || req.getRecipientEmail() != null) {
-        delivery.setRecipientName(req.getRecipientName());
-        delivery.setRecipientEmail(req.getRecipientEmail());
-        delivery.setRecipientPhone(req.getRecipientPhone());
+        // Email notification
+        String businessName = businessProfileRepository
+            .findByUser(business)
+            .map(BusinessProfile::getBusinessName)
+            .orElse(business.getFirstName() + " " + business.getLastName());
 
-    // Option C — no recipient, business will share code manually
+        String trackingUrl = frontendUrl + "/track/" + saved.getTrackingCode();
+
+        emailService.sendHtml(
+            customerUser.getEmail(),
+            "📦 New delivery incoming — " + req.getItemDescription(),
+            emailService.newDeliveryTemplate(
+                customerUser.getFirstName(),
+                businessName,
+                req.getItemDescription(),
+                saved.getTrackingCode(),
+                trackingUrl
+            )
+        );
+
+        return saved;
     }
-    // else: no recipient set, delivery.customer stays null
 
-    return deliveryRepository.save(delivery);
-}
+    // ─── READ ─────────────────────────────────────────────────────────────────
 
     public List<DeliveryRequest> getBusinessDeliveries(String email) {
         User business = getUserByEmail(email);
@@ -90,6 +116,14 @@ public class DeliveryService {
         User driver = getUserByEmail(email);
         return deliveryRepository.findByDriver(driver);
     }
+
+    public DeliveryRequest trackByCode(String code) {
+        return deliveryRepository.findByTrackingCode(code)
+            .orElseThrow(() -> new ResourceNotFoundException(
+                "No delivery found with tracking code: " + code));
+    }
+
+    // ─── DRIVER ACTIONS ───────────────────────────────────────────────────────
 
     public DeliveryRequest acceptDelivery(Long deliveryId, String driverEmail) {
         DeliveryRequest delivery = getDeliveryById(deliveryId);
@@ -116,13 +150,27 @@ public class DeliveryService {
 
         DeliveryRequest saved = deliveryRepository.save(delivery);
 
-        // notify customer and business
+        // Notifications
+        String trackingUrl = frontendUrl + "/track/" + saved.getTrackingCode();
+
         notificationService.send(delivery.getCustomer(),
-            "🚗 " + driver.getFirstName() + " accepted your delivery and is on the way!",
+            "🚗 " + driver.getFirstName() + " accepted your delivery and is heading to pick it up!",
             "DELIVERY_ACCEPTED");
+
         notificationService.send(delivery.getBusiness(),
             "✅ Driver " + driver.getFirstName() + " accepted delivery #" + deliveryId,
             "DELIVERY_ACCEPTED");
+
+        emailService.sendHtml(
+            delivery.getCustomer().getEmail(),
+            "🚗 Your driver is on the way!",
+            emailService.deliveryAcceptedTemplate(
+                delivery.getCustomer().getFirstName(),
+                driver.getFirstName() + " " + driver.getLastName(),
+                saved.getTrackingCode(),
+                trackingUrl
+            )
+        );
 
         return saved;
     }
@@ -139,42 +187,75 @@ public class DeliveryService {
 
         delivery.setStatus(newStatus);
 
-        if (newStatus == DeliveryStatus.PICKED_UP) {
-            delivery.setPickedUpAt(LocalDateTime.now());
-            notificationService.send(delivery.getCustomer(),
-                "📦 Your package has been picked up and is heading your way!",
-                "PICKED_UP");
-        }
+        switch (newStatus) {
+            case PICKED_UP -> {
+                delivery.setPickedUpAt(LocalDateTime.now());
+                notificationService.send(delivery.getCustomer(),
+                    "📦 Your package has been picked up! It's on its way to you.",
+                    "PICKED_UP");
+            }
+            case ON_THE_WAY -> {
+                notificationService.send(delivery.getCustomer(),
+                    "🛵 Your delivery is on the way! Get ready to receive it.",
+                    "ON_THE_WAY");
+            }
+            case DELIVERED -> {
+                delivery.setDeliveredAt(LocalDateTime.now());
 
-        if (newStatus == DeliveryStatus.ON_THE_WAY) {
-            notificationService.send(delivery.getCustomer(),
-                "🛵 Your delivery is on the way! Get ready to receive it.",
-                "ON_THE_WAY");
-        }
+                // Free driver
+                driverProfileRepository.findByUser(driver).ifPresent(p -> {
+                    p.setAvailable(true);
+                    p.setTotalDeliveries(p.getTotalDeliveries() + 1);
+                    driverProfileRepository.save(p);
+                });
 
-        if (newStatus == DeliveryStatus.DELIVERED) {
-            delivery.setDeliveredAt(LocalDateTime.now());
-            driverProfileRepository.findByUser(driver).ifPresent(p -> {
-                p.setAvailable(true);
-                p.setTotalDeliveries(p.getTotalDeliveries() + 1);
-                driverProfileRepository.save(p);
-            });
-            notificationService.send(delivery.getCustomer(),
-                "🎉 Your delivery has arrived! Don't forget to rate your driver.",
-                "DELIVERED");
-            notificationService.send(delivery.getBusiness(),
-                "✅ Delivery #" + deliveryId + " completed successfully!",
-                "DELIVERED");
-        }
+                // Notifications
+                notificationService.send(delivery.getCustomer(),
+                    "🎉 Your delivery has arrived! Don't forget to rate your driver.",
+                    "DELIVERED");
+                notificationService.send(delivery.getBusiness(),
+                    "✅ Delivery #" + deliveryId + " completed successfully!",
+                    "DELIVERED");
 
-        if (newStatus == DeliveryStatus.CANCELLED) {
-            notificationService.send(delivery.getCustomer(),
-                "❌ Your delivery #" + deliveryId + " was cancelled.",
-                "CANCELLED");
+                // Email to customer
+                String trackingUrl = frontendUrl + "/track/" + delivery.getTrackingCode();
+                String businessName = businessProfileRepository
+                    .findByUser(delivery.getBusiness())
+                    .map(BusinessProfile::getBusinessName)
+                    .orElse(delivery.getBusiness().getFirstName());
+
+                emailService.sendHtml(
+                    delivery.getCustomer().getEmail(),
+                    "🎉 Your delivery has arrived!",
+                    emailService.deliveredTemplate(
+                        delivery.getCustomer().getFirstName(),
+                        delivery.getItemDescription(),
+                        businessName,
+                        trackingUrl
+                    )
+                );
+            }
+            case CANCELLED -> {
+                notificationService.send(delivery.getCustomer(),
+                    "❌ Your delivery #" + deliveryId + " was cancelled.",
+                    "CANCELLED");
+            }
+            default -> {}
         }
 
         return deliveryRepository.save(delivery);
     }
+
+    public void updateLocation(String driverEmail, Double lat, Double lng) {
+        User driver = getUserByEmail(driverEmail);
+        driverProfileRepository.findByUser(driver).ifPresent(p -> {
+            p.setCurrentLatitude(lat);
+            p.setCurrentLongitude(lng);
+            driverProfileRepository.save(p);
+        });
+    }
+
+    // ─── BUSINESS ACTIONS ─────────────────────────────────────────────────────
 
     public DeliveryRequest cancelDelivery(Long deliveryId, String businessEmail) {
         DeliveryRequest delivery = getDeliveryById(deliveryId);
@@ -190,6 +271,7 @@ public class DeliveryService {
             throw new InvalidOperationException("Already cancelled");
         }
 
+        // Free the driver if assigned
         if (delivery.getDriver() != null) {
             driverProfileRepository.findByUser(delivery.getDriver()).ifPresent(p -> {
                 p.setAvailable(true);
@@ -207,6 +289,8 @@ public class DeliveryService {
         delivery.setStatus(DeliveryStatus.CANCELLED);
         return deliveryRepository.save(delivery);
     }
+
+    // ─── CUSTOMER ACTIONS ─────────────────────────────────────────────────────
 
     public DeliveryRequest rateDelivery(Long deliveryId, int rating, String customerEmail) {
         DeliveryRequest delivery = getDeliveryById(deliveryId);
@@ -226,11 +310,14 @@ public class DeliveryService {
 
         if (delivery.getDriver() != null) {
             driverProfileRepository.findByUser(delivery.getDriver()).ifPresent(p -> {
-                double newRating = ((p.getRating() * p.getTotalDeliveries()) + rating)
-                    / (p.getTotalDeliveries() + 1);
+                double newRating = p.getTotalDeliveries() > 0
+                    ? ((p.getRating() * p.getTotalDeliveries()) + rating)
+                        / (p.getTotalDeliveries() + 1)
+                    : rating;
                 p.setRating(Math.round(newRating * 10.0) / 10.0);
                 driverProfileRepository.save(p);
             });
+
             notificationService.send(delivery.getDriver(),
                 "⭐ You received a " + rating + "/5 rating for delivery #" + deliveryId,
                 "RATED");
@@ -239,20 +326,7 @@ public class DeliveryService {
         return deliveryRepository.save(delivery);
     }
 
-    public void updateLocation(String driverEmail, Double lat, Double lng) {
-        User driver = getUserByEmail(driverEmail);
-        driverProfileRepository.findByUser(driver).ifPresent(p -> {
-            p.setCurrentLatitude(lat);
-            p.setCurrentLongitude(lng);
-            driverProfileRepository.save(p);
-        });
-    }
-
-    public DeliveryRequest trackByCode(String code) {
-        return deliveryRepository.findByTrackingCode(code)
-            .orElseThrow(() -> new ResourceNotFoundException(
-                "No delivery found with tracking code: " + code));
-    }
+    // ─── HELPERS ──────────────────────────────────────────────────────────────
 
     private String generateTrackingCode() {
         String chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
