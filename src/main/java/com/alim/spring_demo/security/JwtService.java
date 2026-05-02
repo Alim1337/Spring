@@ -1,20 +1,21 @@
 package com.alim.spring_demo.security;
 
+import java.util.Date;
+
+import javax.crypto.SecretKey;
+
+import org.springframework.stereotype.Service;
+
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
-import org.springframework.stereotype.Service;
-
-import javax.crypto.SecretKey;
-import java.util.Date;
 
 @Service
 public class JwtService {
 
     // Secret key — in production this goes in application.properties, not here
     private static final String SECRET = "your-super-secret-key-that-is-long-enough-32chars";
-    private static final long EXPIRATION_MS = 86400000; // 24 hours
-
+    private static final long EXPIRATION_MS = 604800000L; // 7 days
     private SecretKey getKey() {
         return Keys.hmacShaKeyFor(SECRET.getBytes());
     }
