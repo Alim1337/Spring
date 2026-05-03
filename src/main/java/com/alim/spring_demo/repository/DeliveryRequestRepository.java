@@ -16,5 +16,6 @@ public interface DeliveryRequestRepository extends JpaRepository<DeliveryRequest
     List<DeliveryRequest> findByCustomer(User customer);
     List<DeliveryRequest> findByDriver(User driver);
     List<DeliveryRequest> findByStatus(DeliveryStatus status);
+List<DeliveryRequest> findAllByOrderByCreatedAtDesc();
     Optional<DeliveryRequest> findByTrackingCode(String trackingCode);
 }

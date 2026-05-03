@@ -54,19 +54,21 @@ public class SecurityConfig {
                 .frameOptions(frame -> frame.disable())
             )
             .authorizeHttpRequests(auth -> auth
-                .requestMatchers(
-                    "/api/auth/**",
-                    "/api/deliveries/track/**",
-                    "/swagger-ui/**",
-                    "/swagger-ui.html",
-                    "/swagger-ui/index.html",
-                    "/v3/api-docs/**",
-                    "/v3/api-docs",
-                    "/webjars/**"
-                ).permitAll()
-                .requestMatchers(HttpMethod.DELETE, "/api/**").hasRole("ADMIN")
-                .anyRequest().authenticated()
-            )
+    .requestMatchers(
+        "/api/auth/**",
+        "/api/deliveries/track/**",
+        "/swagger-ui/**",
+        "/swagger-ui.html",
+        "/swagger-ui/index.html",
+        "/v3/api-docs/**",
+        "/v3/api-docs",
+        "/webjars/**"
+    ).permitAll()
+    .requestMatchers(HttpMethod.DELETE, "/api/**").hasRole("ADMIN")
+    .requestMatchers("/api/users/all").hasRole("ADMIN")
+    .requestMatchers("/api/deliveries/admin/**").hasRole("ADMIN")
+    .anyRequest().authenticated()
+)
             .sessionManagement(session -> session
                 .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
             )

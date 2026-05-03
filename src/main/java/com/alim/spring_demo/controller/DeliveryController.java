@@ -19,10 +19,12 @@ import com.alim.spring_demo.dto.DeliveryRequestCreate;
 import com.alim.spring_demo.dto.DeliveryRequestResponse;
 import com.alim.spring_demo.entity.DeliveryRequest;
 import com.alim.spring_demo.entity.DeliveryStatus;
+import com.alim.spring_demo.exception.InvalidOperationException;
+import com.alim.spring_demo.exception.ResourceNotFoundException;
 import com.alim.spring_demo.mapper.DeliveryMapper;
 import com.alim.spring_demo.repository.DriverProfileRepository;
 import com.alim.spring_demo.service.DeliveryService;
-
+import com.alim.spring_demo.repository.DeliveryRequestRepository;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 
@@ -34,7 +36,7 @@ public class DeliveryController {
     private final DeliveryService deliveryService;
     private final DeliveryMapper deliveryMapper;
     private final DriverProfileRepository driverProfileRepository;
-
+    private final DeliveryRequestRepository deliveryRepository;
     @PostMapping
     public ResponseEntity<DeliveryRequestResponse> create(
             @Valid @RequestBody DeliveryRequestCreate req,
@@ -155,5 +157,39 @@ public ResponseEntity<Map<String, Object>> getDriverLocation(
             ));
         })
         .orElse(ResponseEntity.ok(Map.of("available", false)));
+}
+// ADMIN: get ALL deliveries in system
+@GetMapping("/admin/all")
+public ResponseEntity<List<DeliveryRequestResponse>> getAllDeliveriesAdmin() {
+    return ResponseEntity.ok(
+        deliveryRepository.findAllByOrderByCreatedAtDesc()
+            .stream()
+            .map(deliveryMapper::toResponse)
+            .toList()
+    );
+}
+
+// ADMIN: cancel any delivery
+@PatchMapping("/admin/{id}/cancel")
+public ResponseEntity<DeliveryRequestResponse> adminCancel(
+        @PathVariable Long id) {
+    DeliveryRequest delivery = deliveryRepository.findById(id)
+        .orElseThrow(() -> new ResourceNotFoundException("Delivery not found"));
+
+    if (delivery.getStatus() == DeliveryStatus.DELIVERED ||
+        delivery.getStatus() == DeliveryStatus.CANCELLED) {
+        throw new InvalidOperationException("Cannot cancel this delivery");
+    }
+
+    if (delivery.getDriver() != null) {
+        driverProfileRepository.findByUser(delivery.getDriver()).ifPresent(p -> {
+            p.setAvailable(true);
+            driverProfileRepository.save(p);
+        });
+    }
+
+    delivery.setStatus(DeliveryStatus.CANCELLED);
+    return ResponseEntity.ok(
+        deliveryMapper.toResponse(deliveryRepository.save(delivery)));
 }
 }
