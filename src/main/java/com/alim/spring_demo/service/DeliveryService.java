@@ -6,8 +6,7 @@ import java.util.Random;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
-
-import com.alim.spring_demo.config.WebSocketService;
+import com.alim.spring_demo.service.WebSocketService; // ✅ CORRECT
 import com.alim.spring_demo.dto.DeliveryRequestCreate;
 import com.alim.spring_demo.entity.BusinessProfile;
 import com.alim.spring_demo.entity.Customer;
