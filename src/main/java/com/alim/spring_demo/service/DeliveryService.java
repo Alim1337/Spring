@@ -7,6 +7,7 @@ import java.util.Random;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
+import com.alim.spring_demo.config.WebSocketService;
 import com.alim.spring_demo.dto.DeliveryRequestCreate;
 import com.alim.spring_demo.entity.BusinessProfile;
 import com.alim.spring_demo.entity.Customer;
@@ -28,7 +29,7 @@ import lombok.RequiredArgsConstructor;
 @Service
 @RequiredArgsConstructor
 public class DeliveryService {
-
+    private final WebSocketService webSocketService;
     private final CustomerRepository customerRepository;
     private final DeliveryRequestRepository deliveryRepository;
     private final UserRepository userRepository;
@@ -149,6 +150,12 @@ public class DeliveryService {
         driverProfileRepository.save(profile);
 
         DeliveryRequest saved = deliveryRepository.save(delivery);
+        webSocketService.broadcastDeliveryUpdate(
+    saved.getId(), "ACCEPTED", null, null);
+webSocketService.notifyUser(
+    delivery.getCustomer().getEmail(),
+    "🚗 Driver accepted your delivery!",
+    "DELIVERY_ACCEPTED");
 
         // Notifications
         String trackingUrl = frontendUrl + "/track/" + saved.getTrackingCode();
@@ -208,6 +215,22 @@ public class DeliveryService {
                     p.setTotalDeliveries(p.getTotalDeliveries() + 1);
                     driverProfileRepository.save(p);
                 });
+                // Get driver location if available
+Double[] location = driverProfileRepository.findByUser(driver)
+    .map(p -> new Double[]{p.getCurrentLatitude(), p.getCurrentLongitude()})
+    .orElse(new Double[]{null, null});
+
+webSocketService.broadcastDeliveryUpdate(
+    delivery.getId(),
+    newStatus.name(),
+    location[0],
+    location[1]
+);
+webSocketService.notifyUser(
+    delivery.getCustomer().getEmail(),
+    "📦 Delivery status: " + newStatus.name().replace("_", " "),
+    newStatus.name()
+);
 
                 // Notifications
                 notificationService.send(delivery.getCustomer(),
@@ -248,10 +271,23 @@ public class DeliveryService {
 
     public void updateLocation(String driverEmail, Double lat, Double lng) {
         User driver = getUserByEmail(driverEmail);
+
         driverProfileRepository.findByUser(driver).ifPresent(p -> {
             p.setCurrentLatitude(lat);
             p.setCurrentLongitude(lng);
             driverProfileRepository.save(p);
+
+            // ✅ WEBSOCKET LOCATION BROADCAST
+            deliveryRepository.findByDriver(driver).stream()
+                .filter(d -> d.getStatus() == DeliveryStatus.ON_THE_WAY ||
+                             d.getStatus() == DeliveryStatus.PICKED_UP)
+                .findFirst()
+                .ifPresent(d -> webSocketService.broadcastDeliveryUpdate(
+                    d.getId(),
+                    d.getStatus().name(),
+                    p.getCurrentLatitude(),
+                    p.getCurrentLongitude()
+                ));
         });
     }
 
