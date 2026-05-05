@@ -43,58 +43,84 @@ public class DeliveryService {
     // ─── CREATE ───────────────────────────────────────────────────────────────
 
     public DeliveryRequest createDelivery(DeliveryRequestCreate req, String businessEmail) {
-        User business = getUserByEmail(businessEmail);
+    User business = getUserByEmail(businessEmail);
 
-        Customer customer = customerRepository.findById(req.getCustomerId())
-            .orElseThrow(() -> new ResourceNotFoundException(
-                "Customer not found with id: " + req.getCustomerId()));
+    DeliveryRequest delivery = new DeliveryRequest();
+    delivery.setBusiness(business);
+    delivery.setPickupAddress(req.getPickupAddress());
+    delivery.setDropoffAddress(req.getDropoffAddress());
+    delivery.setItemDescription(req.getItemDescription());
+    delivery.setPrice(req.getPrice());
+    delivery.setRecipientType(req.getRecipientType());
+    delivery.setTrackingCode(generateTrackingCode());
 
-        User customerUser = userRepository.findByEmail(customer.getEmail())
-            .orElseThrow(() -> new ResourceNotFoundException(
-                "User not found for customer email: " + customer.getEmail()));
+    String businessName = businessProfileRepository
+        .findByUser(business)
+        .map(BusinessProfile::getBusinessName)
+        .orElse(business.getFirstName() + " " + business.getLastName());
 
-        if (customerUser.getRole() != Role.CUSTOMER) {
-            throw new InvalidOperationException("Target user is not a customer");
+    String trackingUrl = frontendUrl + "/track/" + delivery.getTrackingCode();
+
+    switch (req.getRecipientType()) {
+
+        case REGISTERED -> {
+            if (req.getCustomerId() == null) {
+                throw new InvalidOperationException("Customer ID required for REGISTERED type");
+            }
+            Customer customer = customerRepository.findById(req.getCustomerId())
+                .orElseThrow(() -> new ResourceNotFoundException(
+                    "Customer not found with id: " + req.getCustomerId()));
+            User customerUser = userRepository.findByEmail(customer.getEmail())
+                .orElseThrow(() -> new ResourceNotFoundException(
+                    "User not found for customer email: " + customer.getEmail()));
+            if (customerUser.getRole() != Role.CUSTOMER) {
+                throw new InvalidOperationException("Target user is not a customer");
+            }
+            delivery.setCustomer(customerUser);
+
+            // In-app + email notification to registered customer
+            notificationService.send(customerUser,
+                "📦 New delivery incoming: " + req.getItemDescription(), "NEW_DELIVERY");
+            emailService.sendHtml(
+                customerUser.getEmail(),
+                "📦 New delivery incoming — " + req.getItemDescription(),
+                emailService.newDeliveryTemplate(
+                    customerUser.getFirstName(), businessName,
+                    req.getItemDescription(), delivery.getTrackingCode(), trackingUrl)
+            );
         }
 
-        DeliveryRequest delivery = new DeliveryRequest();
-        delivery.setBusiness(business);
-        delivery.setCustomer(customerUser);
-        delivery.setPickupAddress(req.getPickupAddress());
-        delivery.setDropoffAddress(req.getDropoffAddress());
-        delivery.setItemDescription(req.getItemDescription());
-        delivery.setPrice(req.getPrice());
-        delivery.setTrackingCode(generateTrackingCode());
+        case EMAIL_ONLY -> {
+            if (req.getRecipientEmail() == null || req.getRecipientEmail().isBlank()) {
+                throw new InvalidOperationException("Recipient email is required");
+            }
+            delivery.setRecipientName(req.getRecipientName());
+            delivery.setRecipientPhone(req.getRecipientPhone());
+            delivery.setRecipientEmail(req.getRecipientEmail());
 
-        DeliveryRequest saved = deliveryRepository.save(delivery);
+            // Send tracking code via email (no account needed)
+            emailService.sendHtml(
+                req.getRecipientEmail(),
+                "📦 Your delivery from " + businessName,
+                emailService.newDeliveryExternalTemplate(
+                    req.getRecipientName() != null ? req.getRecipientName() : "Customer",
+                    businessName,
+                    req.getItemDescription(),
+                    delivery.getTrackingCode(),
+                    trackingUrl)
+            );
+        }
 
-        // In-app notification
-        notificationService.send(customerUser,
-            "📦 New delivery incoming: " + req.getItemDescription(),
-            "NEW_DELIVERY");
-
-        // Email notification
-        String businessName = businessProfileRepository
-            .findByUser(business)
-            .map(BusinessProfile::getBusinessName)
-            .orElse(business.getFirstName() + " " + business.getLastName());
-
-        String trackingUrl = frontendUrl + "/track/" + saved.getTrackingCode();
-
-        emailService.sendHtml(
-            customerUser.getEmail(),
-            "📦 New delivery incoming — " + req.getItemDescription(),
-            emailService.newDeliveryTemplate(
-                customerUser.getFirstName(),
-                businessName,
-                req.getItemDescription(),
-                saved.getTrackingCode(),
-                trackingUrl
-            )
-        );
-
-        return saved;
+        case MANUAL -> {
+            // Business shares the tracking code themselves — no email sent
+            delivery.setRecipientName(req.getRecipientName());
+            delivery.setRecipientPhone(req.getRecipientPhone());
+            delivery.setRecipientEmail(req.getRecipientEmail());
+        }
     }
+
+    return deliveryRepository.save(delivery);
+}
 
     // ─── READ ─────────────────────────────────────────────────────────────────
 

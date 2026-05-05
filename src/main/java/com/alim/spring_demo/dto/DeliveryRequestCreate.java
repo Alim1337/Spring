@@ -1,5 +1,6 @@
 package com.alim.spring_demo.dto;
 
+import com.alim.spring_demo.entity.RecipientType;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
@@ -7,11 +8,16 @@ import lombok.Data;
 @Data
 public class DeliveryRequestCreate {
 
-    // ALL recipient fields are optional
-    private Long customerId;          // registered customer
-    private String recipientName;     // unregistered recipient name
-    private String recipientEmail;    // unregistered recipient email
-    private String recipientPhone;    // unregistered recipient phone
+    @NotNull(message = "Recipient type is required")
+    private RecipientType recipientType; // REGISTERED, EMAIL_ONLY, MANUAL
+
+    // Used when recipientType = REGISTERED
+    private Long customerId;
+
+    // Used when recipientType = EMAIL_ONLY or MANUAL
+    private String recipientName;
+    private String recipientPhone;
+    private String recipientEmail; // required for EMAIL_ONLY
 
     @NotBlank(message = "Pickup address is required")
     private String pickupAddress;

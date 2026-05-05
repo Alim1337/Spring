@@ -34,20 +34,18 @@ public class DeliveryRequest {
     @JoinColumn(name = "business_user_id", nullable = false)
     private User business;
 
-    // nullable — recipient might not be a registered user
+    // Registered customer (nullable — not always needed)
     @ManyToOne
     @JoinColumn(name = "customer_user_id")
     private User customer;
 
-    // for unregistered recipients
-    @Column
+    // For non-registered recipients
     private String recipientName;
-
-    @Column
+    private String recipientPhone;
     private String recipientEmail;
 
-    @Column
-    private String recipientPhone;
+    @Enumerated(EnumType.STRING)
+    private RecipientType recipientType = RecipientType.REGISTERED;
 
     @ManyToOne
     @JoinColumn(name = "driver_user_id")

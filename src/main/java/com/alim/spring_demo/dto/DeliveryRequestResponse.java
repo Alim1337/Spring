@@ -3,6 +3,7 @@ package com.alim.spring_demo.dto;
 import java.time.LocalDateTime;
 
 import com.alim.spring_demo.entity.DeliveryStatus;
+import com.alim.spring_demo.entity.RecipientType;
 
 import lombok.Data;
 
@@ -12,16 +13,14 @@ public class DeliveryRequestResponse {
     private String trackingCode;
     private String businessName;
 
-    // recipient info (registered or not)
+    // Recipient info (works for all 3 types)
     private String customerName;
     private String customerPhone;
     private String customerEmail;
-    private boolean customerRegistered;
+    private RecipientType recipientType;
 
-    // driver info
     private String driverName;
     private String driverPhone;
-
     private String pickupAddress;
     private String dropoffAddress;
     private String itemDescription;

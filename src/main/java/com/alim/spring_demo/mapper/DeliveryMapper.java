@@ -4,6 +4,7 @@ import org.springframework.stereotype.Component;
 
 import com.alim.spring_demo.dto.DeliveryRequestResponse;
 import com.alim.spring_demo.entity.DeliveryRequest;
+import com.alim.spring_demo.entity.RecipientType;
 import com.alim.spring_demo.repository.BusinessProfileRepository;
 
 import lombok.RequiredArgsConstructor;
@@ -18,35 +19,31 @@ public class DeliveryMapper {
         DeliveryRequestResponse res = new DeliveryRequestResponse();
         res.setId(d.getId());
         res.setTrackingCode(d.getTrackingCode());
+        res.setRecipientType(d.getRecipientType());
 
-        // business name from profile or fallback to user name
+        // Business name
         String businessName = businessProfileRepository
             .findByUser(d.getBusiness())
             .map(bp -> bp.getBusinessName())
-            .orElse(d.getBusiness().getFirstName()
-                + " " + d.getBusiness().getLastName());
+            .orElse(d.getBusiness().getFirstName() + " " + d.getBusiness().getLastName());
         res.setBusinessName(businessName);
 
-        // recipient — registered customer or manual info
-        if (d.getCustomer() != null) {
-            res.setCustomerName(d.getCustomer().getFirstName()
-                + " " + d.getCustomer().getLastName());
+        // Recipient info — works for all 3 types
+        if (d.getRecipientType() == RecipientType.REGISTERED && d.getCustomer() != null) {
+            res.setCustomerName(d.getCustomer().getFirstName() + " " + d.getCustomer().getLastName());
             res.setCustomerPhone(d.getCustomer().getPhone());
             res.setCustomerEmail(d.getCustomer().getEmail());
-            res.setCustomerRegistered(true);
         } else {
             res.setCustomerName(d.getRecipientName());
             res.setCustomerPhone(d.getRecipientPhone());
             res.setCustomerEmail(d.getRecipientEmail());
-            res.setCustomerRegistered(false);
         }
 
-        // driver
+        // Driver info
         res.setDriverName(d.getDriver() != null
             ? d.getDriver().getFirstName() + " " + d.getDriver().getLastName()
             : null);
-        res.setDriverPhone(d.getDriver() != null
-            ? d.getDriver().getPhone() : null);
+        res.setDriverPhone(d.getDriver() != null ? d.getDriver().getPhone() : null);
 
         res.setPickupAddress(d.getPickupAddress());
         res.setDropoffAddress(d.getDropoffAddress());
