@@ -22,12 +22,14 @@ public class CorsConfig {
         config.setAllowedOrigins(List.of(
             "http://localhost:3000",
             "https://delivery-frontend-fawn.vercel.app",
-            frontendUrl
+            frontendUrl  // dynamic — picks up Railway env var
         ));
+
         config.setAllowCredentials(true);
         config.setAllowedHeaders(List.of("*"));
         config.setAllowedMethods(List.of(
-            "GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
+            "GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"
+        ));
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", config);
