@@ -1,13 +1,14 @@
 package com.alim.spring_demo.service;
 
-import jakarta.mail.internet.MimeMessage;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
+
+import jakarta.mail.internet.MimeMessage;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 @Service
 @RequiredArgsConstructor
@@ -16,37 +17,46 @@ public class EmailService {
 
     private final JavaMailSender mailSender;
 
-    @Value("${MAIL_USERNAME:}")
+    // ✅ FIXED: correct property key
+    @Value("${spring.mail.username}")
     private String mailUsername;
 
     @Async
     public void sendHtml(String to, String subject, String htmlBody) {
-        // Skip if no email credentials configured
-        if (mailUsername == null || mailUsername.isBlank()) {
-            log.warn("Email not configured — skipping email to: {}", to);
-            return;
-        }
+
+        // Validate recipient
         if (to == null || to.isBlank()) {
             log.warn("No recipient email — skipping");
             return;
         }
+
         try {
             MimeMessage message = mailSender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+
             helper.setTo(to);
             helper.setSubject(subject);
             helper.setText(htmlBody, true);
+
+            // Use configured sender
             helper.setFrom(mailUsername);
+
             mailSender.send(message);
-            log.info("Email sent to: {}", to);
+
+            log.info("✅ Email sent to: {}", to);
+
         } catch (Exception e) {
-            log.error("Failed to send email to {}: {}", to, e.getMessage());
+            log.error("❌ Failed to send email to {}: {}", to, e.getMessage(), e);
         }
     }
 
+    // ===========================
+    // EMAIL TEMPLATES
+    // ===========================
+
     public String newDeliveryTemplate(String customerName, String businessName,
-                                       String itemDescription, String trackingCode,
-                                       String trackingUrl) {
+                                      String itemDescription, String trackingCode,
+                                      String trackingUrl) {
         return """
             <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
               <div style="background: #2563eb; padding: 20px; border-radius: 12px 12px 0 0; text-align: center;">
@@ -64,17 +74,14 @@ public class EmailService {
                 <a href="%s" style="display: block; background: #2563eb; color: white; text-align: center; padding: 14px; border-radius: 8px; text-decoration: none; font-weight: bold; margin-top: 16px;">
                   Track Your Delivery →
                 </a>
-                <p style="color: #9ca3af; font-size: 12px; text-align: center; margin-top: 20px;">
-                  DeliverFlow — Smart delivery management
-                </p>
               </div>
             </div>
             """.formatted(customerName, businessName, itemDescription, trackingCode, trackingUrl);
     }
 
     public String newDeliveryExternalTemplate(String recipientName, String businessName,
-                                               String itemDescription, String trackingCode,
-                                               String trackingUrl) {
+                                              String itemDescription, String trackingCode,
+                                              String trackingUrl) {
         return """
             <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
               <div style="background: #2563eb; padding: 20px; border-radius: 12px 12px 0 0; text-align: center;">
@@ -93,19 +100,13 @@ public class EmailService {
                 <a href="%s" style="display: block; background: #2563eb; color: white; text-align: center; padding: 14px; border-radius: 8px; text-decoration: none; font-weight: bold; margin-top: 16px;">
                   Track My Delivery →
                 </a>
-                <p style="color: #6b7280; font-size: 13px; text-align: center; margin-top: 16px;">
-                  No account needed — just click the button above.
-                </p>
-                <p style="color: #9ca3af; font-size: 11px; text-align: center; margin-top: 8px;">
-                  DeliverFlow — Smart delivery management
-                </p>
               </div>
             </div>
             """.formatted(recipientName, businessName, itemDescription, trackingCode, trackingUrl);
     }
 
     public String deliveryAcceptedTemplate(String customerName, String driverName,
-                                            String trackingCode, String trackingUrl) {
+                                           String trackingCode, String trackingUrl) {
         return """
             <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
               <div style="background: #16a34a; padding: 20px; border-radius: 12px 12px 0 0; text-align: center;">
@@ -123,7 +124,7 @@ public class EmailService {
     }
 
     public String deliveredTemplate(String customerName, String itemDescription,
-                                     String businessName, String trackingUrl) {
+                                    String businessName, String trackingUrl) {
         return """
             <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
               <div style="background: #7c3aed; padding: 20px; border-radius: 12px 12px 0 0; text-align: center;">
