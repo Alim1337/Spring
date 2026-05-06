@@ -17,42 +17,37 @@ public class EmailService {
 
     private final JavaMailSender mailSender;
 
-    // ✅ FIXED: correct property key
-    @Value("${spring.mail.username}")
+    @Value("${spring.mail.username:}")
     private String mailUsername;
 
     @Async
     public void sendHtml(String to, String subject, String htmlBody) {
-
-        // Validate recipient
         if (to == null || to.isBlank()) {
             log.warn("No recipient email — skipping");
             return;
         }
+        if (mailUsername == null || mailUsername.isBlank()) {
+            log.warn("Mail not configured — skipping email to: {}", to);
+            return;
+        }
+
+        log.info("Attempting to send email to: {} | subject: {}", to, subject);
 
         try {
             MimeMessage message = mailSender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
-
             helper.setTo(to);
             helper.setSubject(subject);
             helper.setText(htmlBody, true);
-
-            // Use configured sender
             helper.setFrom(mailUsername);
-
             mailSender.send(message);
-
-            log.info("✅ Email sent to: {}", to);
-
+            log.info("✅ Email sent successfully to: {}", to);
         } catch (Exception e) {
-            log.error("❌ Failed to send email to {}: {}", to, e.getMessage(), e);
+            log.error("❌ Email failed to: {} | error: {}", to, e.getMessage());
+            // Print full stack trace so we can see exact error
+            e.printStackTrace();
         }
     }
-
-    // ===========================
-    // EMAIL TEMPLATES
-    // ===========================
 
     public String newDeliveryTemplate(String customerName, String businessName,
                                       String itemDescription, String trackingCode,
@@ -74,6 +69,9 @@ public class EmailService {
                 <a href="%s" style="display: block; background: #2563eb; color: white; text-align: center; padding: 14px; border-radius: 8px; text-decoration: none; font-weight: bold; margin-top: 16px;">
                   Track Your Delivery →
                 </a>
+                <p style="color: #9ca3af; font-size: 12px; text-align: center; margin-top: 20px;">
+                  DeliverFlow — Smart delivery management
+                </p>
               </div>
             </div>
             """.formatted(customerName, businessName, itemDescription, trackingCode, trackingUrl);
@@ -100,6 +98,12 @@ public class EmailService {
                 <a href="%s" style="display: block; background: #2563eb; color: white; text-align: center; padding: 14px; border-radius: 8px; text-decoration: none; font-weight: bold; margin-top: 16px;">
                   Track My Delivery →
                 </a>
+                <p style="color: #6b7280; font-size: 13px; text-align: center; margin-top: 16px;">
+                  No account needed — just click the button above.
+                </p>
+                <p style="color: #9ca3af; font-size: 11px; text-align: center; margin-top: 8px;">
+                  DeliverFlow — Smart delivery management
+                </p>
               </div>
             </div>
             """.formatted(recipientName, businessName, itemDescription, trackingCode, trackingUrl);
