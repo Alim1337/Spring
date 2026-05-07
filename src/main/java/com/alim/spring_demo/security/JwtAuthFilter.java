@@ -22,18 +22,28 @@ public class JwtAuthFilter extends OncePerRequestFilter {
     private final JwtService jwtService;
     private final UserDetailsService userDetailsService;
 
-    @Override
-    protected void doFilterInternal(HttpServletRequest request,
-                                    HttpServletResponse response,
-                                    FilterChain filterChain)
-            throws ServletException, IOException {
+   @Override
+protected void doFilterInternal(HttpServletRequest request,
+                                HttpServletResponse response,
+                                FilterChain filterChain)
+        throws ServletException, IOException {
 
-        String authHeader = request.getHeader("Authorization");
+    String path = request.getServletPath();
 
-        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
-            filterChain.doFilter(request, response);
-            return;
-        }
+    if (
+        path.startsWith("/api/auth") ||
+        path.startsWith("/ws") ||
+        path.startsWith("/topic") ||
+        path.startsWith("/app") ||
+        path.startsWith("/error") ||
+        path.startsWith("/swagger-ui") ||
+        path.startsWith("/v3/api-docs")
+    ) {
+        filterChain.doFilter(request, response);
+        return;
+    }
+
+    String authHeader = request.getHeader("Authorization");
 
         String token = authHeader.substring(7);
 

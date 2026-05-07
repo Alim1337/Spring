@@ -45,37 +45,65 @@ public class SecurityConfig {
         return config.getAuthenticationManager();
     }
 
-    @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
-        http
-            .cors(Customizer.withDefaults())
-            .csrf(csrf -> csrf.disable())
-            .headers(headers -> headers
-                .frameOptions(frame -> frame.disable())
-            )
-            .authorizeHttpRequests(auth -> auth
-    .requestMatchers(
-        "/api/auth/**",
-        "/api/deliveries/track/**",
-        "/ws/**", 
-        "/swagger-ui/**",
-        "/swagger-ui.html",
-        "/swagger-ui/index.html",
-        "/v3/api-docs/**",
-        "/v3/api-docs",
-        "/webjars/**"
-    ).permitAll()
-    .requestMatchers(HttpMethod.DELETE, "/api/**").hasRole("ADMIN")
-    .requestMatchers("/api/users/all").hasRole("ADMIN")
-    .requestMatchers("/api/deliveries/admin/**").hasRole("ADMIN")
-    .anyRequest().authenticated()
-)
-            .sessionManagement(session -> session
-                .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
-            )
-            .authenticationProvider(authenticationProvider())
-            .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
+   @Bean
+public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
 
-        return http.build();
-    }
+    http
+        .cors(Customizer.withDefaults())
+
+        .csrf(csrf -> csrf.disable())
+
+        .headers(headers -> headers
+            .frameOptions(frame -> frame.disable())
+        )
+
+        .sessionManagement(session -> session
+            .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
+        )
+
+        .authorizeHttpRequests(auth -> auth
+
+            // PUBLIC ENDPOINTS
+            .requestMatchers(
+                "/api/auth/**",
+                "/api/deliveries/track/**",
+
+                // WEBSOCKET
+                "/ws/**",
+                "/topic/**",
+                "/app/**",
+
+                // ERROR PAGE
+                "/error",
+
+                // SWAGGER
+                "/swagger-ui/**",
+                "/swagger-ui.html",
+                "/swagger-ui/index.html",
+                "/v3/api-docs/**",
+                "/v3/api-docs",
+                "/webjars/**"
+            ).permitAll()
+
+            // ADMIN ONLY
+            .requestMatchers(HttpMethod.DELETE, "/api/**")
+                .hasRole("ADMIN")
+
+            .requestMatchers("/api/users/all")
+                .hasRole("ADMIN")
+
+            .requestMatchers("/api/deliveries/admin/**")
+                .hasRole("ADMIN")
+
+            // EVERYTHING ELSE
+            .anyRequest().authenticated()
+        )
+
+        .authenticationProvider(authenticationProvider())
+
+        .addFilterBefore(jwtAuthFilter,
+                UsernamePasswordAuthenticationFilter.class);
+
+    return http.build();
+}
 }
