@@ -1,24 +1,23 @@
 package com.alim.spring_demo.service;
 
+import com.resend.Resend;
+import com.resend.core.exception.ResendException;
+import com.resend.services.emails.model.CreateEmailOptions;
+import com.resend.services.emails.model.CreateEmailResponse;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.mail.javamail.JavaMailSender;
-import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
-import jakarta.mail.internet.MimeMessage;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
-
 @Service
-@RequiredArgsConstructor
 @Slf4j
 public class EmailService {
 
-    private final JavaMailSender mailSender;
+    @Value("${resend.api.key:}")
+    private String apiKey;
 
-    @Value("${spring.mail.username:}")
-    private String mailUsername;
+    @Value("${resend.from:DeliverFlow <onboarding@resend.dev>}")
+    private String fromAddress;
 
     @Async
     public void sendHtml(String to, String subject, String htmlBody) {
@@ -26,28 +25,32 @@ public class EmailService {
             log.warn("No recipient email — skipping");
             return;
         }
-        if (mailUsername == null || mailUsername.isBlank()) {
-            log.warn("Mail not configured — skipping email to: {}", to);
+        if (apiKey == null || apiKey.isBlank() || apiKey.equals("re_your_key_here")) {
+            log.warn("Resend API key not configured — skipping email to: {}", to);
             return;
         }
 
-        log.info("Attempting to send email to: {} | subject: {}", to, subject);
+        log.info("Sending email to: {} | subject: {}", to, subject);
 
         try {
-            MimeMessage message = mailSender.createMimeMessage();
-            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
-            helper.setTo(to);
-            helper.setSubject(subject);
-            helper.setText(htmlBody, true);
-            helper.setFrom(mailUsername);
-            mailSender.send(message);
-            log.info("✅ Email sent successfully to: {}", to);
-        } catch (Exception e) {
+            Resend resend = new Resend(apiKey);
+
+            CreateEmailOptions params = CreateEmailOptions.builder()
+                .from(fromAddress)
+                .to(to)
+                .subject(subject)
+                .html(htmlBody)
+                .build();
+
+            CreateEmailResponse response = resend.emails().send(params);
+            log.info("✅ Email sent successfully | id: {}", response.getId());
+
+        } catch (ResendException e) {
             log.error("❌ Email failed to: {} | error: {}", to, e.getMessage());
-            // Print full stack trace so we can see exact error
-            e.printStackTrace();
         }
     }
+
+    // ── EMAIL TEMPLATES ────────────────────────────────────────────────────
 
     public String newDeliveryTemplate(String customerName, String businessName,
                                       String itemDescription, String trackingCode,
